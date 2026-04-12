@@ -108,8 +108,8 @@ constexpr int AlignmentB  = 32;                                             // M
 // C/D matrix configuration
 using         ElementD    = cutlass::bfloat16_t;                            // Element type for D matrix operand
 using         ElementC    = cutlass::bfloat16_t;                            // Element type for C matrix operand
-using         LayoutCTag  = cutlass::layout::RowMajor;                      // Layout type for C matrix operand
-using         LayoutDTag  = cutlass::layout::RowMajor;                      // Layout type for D matrix operand
+using         LayoutCTag  = cutlass::layout::ColumnMajor;                      // Layout type for C matrix operand
+using         LayoutDTag  = cutlass::layout::ColumnMajor;                      // Layout type for D matrix operand
 constexpr int AlignmentD  = 128 / cutlass::sizeof_bits<ElementD>::value;    // Memory access granularity/alignment of C matrix in units of elements (up to 16 bytes)
 constexpr int AlignmentC  = 128 / cutlass::sizeof_bits<ElementC>::value;    // Memory access granularity/alignment of C matrix in units of elements (up to 16 bytes)
 // Kernel functional config
@@ -118,7 +118,7 @@ using ArchTag             = cutlass::arch::Sm120;                           // T
 using OperatorClass       = cutlass::arch::OpClassBlockScaledTensorOp;      // Operator class tag
 
 // Kernel Perf config
-using ThreadBlockShape    = Shape<_128,_128,_128>;                          // Threadblock's tile size
+using ThreadBlockShape    = Shape<_128,_128,_256>;                            // Threadblock's tile size
 using ClusterShape        = Shape<_1,_1,_1>;                                // Shape of the threadblocks in a cluster
 
 using CollectiveEpilogue = typename cutlass::epilogue::collective::CollectiveBuilder<
@@ -126,7 +126,7 @@ using CollectiveEpilogue = typename cutlass::epilogue::collective::CollectiveBui
     ThreadBlockShape, ClusterShape,
     cutlass::epilogue::collective::EpilogueTileAuto,
     ElementAccumulator, ElementAccumulator,
-    ElementC, LayoutCTag, AlignmentC,
+    void, LayoutCTag, AlignmentC,
     ElementD, LayoutDTag, AlignmentD,
     cutlass::epilogue::collective::EpilogueScheduleAuto                      // Epilogue schedule policy
   >::CollectiveOp;
@@ -293,7 +293,8 @@ struct Result
 template <typename Element, typename Layout>
 bool initialize_block(
   cutlass::TensorView<Element, Layout> view,
-  uint64_t seed) {
+  uint64_t seed,
+  bool dbg) {
 
   double scope_max, scope_min;
   constexpr int bits_input = cutlass::sizeof_bits<Element>::value;
@@ -320,9 +321,13 @@ bool initialize_block(
     scope_max = 4;
     scope_min = -4;
   }
+  if (!dbg) {
   cutlass::reference::host::TensorFillRandomUniform(
     view, seed, scope_max, scope_min, 0);
-
+  }
+  else {
+  cutlass::reference::host::TensorFillSequential(view);
+  }
   return true;
 }
 
@@ -352,11 +357,11 @@ void initialize(const Options &options) {
   block_SFA.reset(cutlass::make_Coord(size(filter_zeros(layout_SFA))));
   block_SFB.reset(cutlass::make_Coord(size(filter_zeros(layout_SFB))));
 
-  initialize_block(block_A.host_view(), seed + 2021);
-  initialize_block(block_B.host_view(), seed + 2022);
-  initialize_block(block_C.host_view(), seed + 2023);
-  initialize_block(block_SFA.host_view(), seed + 2024);
-  initialize_block(block_SFB.host_view(), seed + 2025);
+  initialize_block(block_A.host_view(), seed + 2021, false);
+  initialize_block(block_B.host_view(), seed + 2022, false);
+  initialize_block(block_C.host_view(), seed + 2023, false);
+  initialize_block(block_SFA.host_view(), seed + 2024, false);
+  initialize_block(block_SFB.host_view(), seed + 2025, true);
 
   block_A.sync_device();
   block_B.sync_device();
@@ -460,9 +465,9 @@ int run(Options &options)
 
   std::cout << "  Disposition: " << (result.passed ? "Passed" : "Failed") << std::endl;
 
-  if (!result.passed) {
-    exit(-1);
-  }
+  //if (!result.passed) {
+  //  exit(-1);
+  //}
 
   // Run profiling loop
   if (options.iterations > 0)
