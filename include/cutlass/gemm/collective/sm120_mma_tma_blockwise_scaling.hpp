@@ -544,6 +544,21 @@ struct CollectiveMma<
       pipeline.producer_tail(smem_pipe_write);
     }
   }
+  
+  template <
+    class FrgTensorC
+  >
+  CUTLASS_DEVICE void
+  mma(MainloopPipeline pipeline,
+      PipelineState smem_pipe_read,
+      FrgTensorC& accum,
+      int k_tile_count,
+      int thread_idx,
+      TensorStorage& shared_tensors,
+      Params const& mainloop_params) {
+    auto empty_tuple = make_tuple(_0{}, _0{}, _0{}, _0{});
+    mma(pipeline, smem_pipe_read, accum, k_tile_count, thread_idx, shared_tensors, mainloop_params, empty_tuple);
+  }
 
   /// Perform a collective-scoped matrix multiply-accumulate
   /// Consumer Perspective
