@@ -11184,7 +11184,8 @@ def GenerateSM120_TensorOp_mixed_8bits_UMMA_gemm_with_block_scaled(manifest, cud
   grouped = is_grouped(gemm_kind)
 
   layouts = [
-    [[LayoutType.RowMajor,    128], [LayoutType.ColumnMajor, 128], [LayoutType.RowMajor,    0]]
+    [[LayoutType.RowMajor,    128], [LayoutType.ColumnMajor, 128], [LayoutType.RowMajor,    0]],
+    [[LayoutType.RowMajor,    128], [LayoutType.ColumnMajor, 128], [LayoutType.ColumnMajor,    0]],
   ]
 
   instruction_sizes = [
@@ -11192,6 +11193,8 @@ def GenerateSM120_TensorOp_mixed_8bits_UMMA_gemm_with_block_scaled(manifest, cud
   ]
 
   tile_sizes = [
+    [128, 32, 128],
+    [128, 64, 128],
     [128, 128, 128]
   ]
 
@@ -11268,6 +11271,16 @@ def GenerateSM120_TensorOp_mixed_8bits_UMMA_gemm_with_block_scaled(manifest, cud
         "a_type"   : math_inst.element_a,
         "b_type"   : math_inst.element_b,
         "c_type"   : DataType.void,
+        "d_type"   : DataType.bf16,
+        "acc_type" : math_inst.element_accumulator,
+        "epi_type" : epi_type,
+        "sf_type"  : math_inst.element_scale_factor,
+        "sfd_type" : {"type": DataType.void, "vector_size": None, "layout" : None}
+      },
+      {
+        "a_type"   : math_inst.element_a,
+        "b_type"   : math_inst.element_b,
+        "c_type"   : DataType.void,
         "d_type"   : DataType.e5m2,
         "acc_type" : math_inst.element_accumulator,
         "epi_type" : epi_type,
@@ -11316,7 +11329,8 @@ def GenerateSM120_TensorOp_fp4_UMMA_gemm_with_block_scaled(manifest, cuda_versio
 
   # layouts for ABC and their alignments.
   layouts = [
-    [[LayoutType.RowMajor,    32], [LayoutType.ColumnMajor, 32], [LayoutType.RowMajor,    0]]
+    [[LayoutType.RowMajor,    32], [LayoutType.ColumnMajor, 32], [LayoutType.RowMajor,    0]],
+    [[LayoutType.RowMajor,    32], [LayoutType.ColumnMajor, 32], [LayoutType.ColumnMajor,    0]]
   ]
 
   instruction_sizes = [
@@ -11324,12 +11338,20 @@ def GenerateSM120_TensorOp_fp4_UMMA_gemm_with_block_scaled(manifest, cuda_versio
   ]
 
   tile_sizes_cooperative = [
+    [128, 32, 128],
+    [128, 32, 256],
+    [128, 64, 128],
+    [128, 64, 256],
     [128, 128, 128],
     [128, 128, 256],
     [256, 128, 128]
   ]
 
   tile_sizes_pingpong = [
+    [128, 32, 128],
+    [128, 32, 256],
+    [128, 64, 128],
+    [128, 64, 256],
     [128, 128, 128],
     [128, 128, 256]
   ]
@@ -11405,9 +11427,7 @@ def GenerateSM120_TensorOp_fp4_UMMA_gemm_with_block_scaled(manifest, cuda_versio
       for tile_size in tile_sizes:
         # nvf4 kernel only supports ue4m3 SF
         # mxf4 kernel only supports ue8m0 SF
-        # grouped schedules only support ue8m0 (MXF4); NVF4 (ue4m3) grouped requires
-        # NVF4-specific PtrArray schedule tags not yet available
-        if (is_grouped_schedule and math_inst.element_scale_factor == DataType.ue8m0) or \
+        if (is_grouped_schedule) or \
            (not is_grouped_schedule and math_inst.element_scale_factor == DataType.ue4m3 and is_nvf4(kernel_schedule)) or \
            (not is_grouped_schedule and math_inst.element_scale_factor == DataType.ue8m0 and not is_nvf4(kernel_schedule)):
           tile_descriptions.append(
@@ -11419,6 +11439,16 @@ def GenerateSM120_TensorOp_fp4_UMMA_gemm_with_block_scaled(manifest, cuda_versio
           "b_type"   : math_inst.element_b,
           "c_type"   : DataType.void,
           "d_type"   : DataType.f32,
+          "acc_type" : math_inst.element_accumulator,
+          "epi_type" : epi_type,
+          "sf_type"  : math_inst.element_scale_factor,
+          "sfd_type" : {"type": DataType.void, "vector_size": None, "layout" : None}
+        },
+        {
+          "a_type"   : math_inst.element_a,
+          "b_type"   : math_inst.element_b,
+          "c_type"   : DataType.void,
+          "d_type"   : DataType.bf16,
           "acc_type" : math_inst.element_accumulator,
           "epi_type" : epi_type,
           "sf_type"  : math_inst.element_scale_factor,
